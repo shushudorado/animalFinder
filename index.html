@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <title>モバイル動物検出</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/coco-ssd"></script>
+  <style>
+    body {
+      margin: 0;
+      overflow: hidden;
+    }
+    video, canvas {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100vw;
+      height: 100vh;
+      object-fit: cover;
+      z-index: 1;
+    }
+    canvas {
+      z-index: 2;
+    }
+  </style>
+</head>
+<body>
+  <video id="video" autoplay playsinline></video>
+  <canvas id="canvas"></canvas>
+
+  <script>
+    const video = document.getElementById("video");
+    const canvas = document.getElementById("canvas");
+    const ctx = canvas.getContext("2d");
+
+    async function setupCamera() {
+      const stream = await navigator.mediaDevices.getUserMedia({
+        video: { facingMode: "environment" }, // 外カメラ指定
+        audio: false
+      });
+      video.srcObject = stream;
+      return new Promise(resolve => {
+        video.onloadedmetadata = () => resolve(video);
+      });
+    }
+
+    async function detect() {
+      const model = await cocoSsd.load();
+      console.log("モデル読み込み完了");
+
+      async function predict() {
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+        const predictions = await model.detect(video);
+        predictions.forEach(pred => {
+          if (["cat", "dog", "horse", "sheep", "cow", "bird","person"].includes(pred.class)) {
+            ctx.strokeStyle = "lime";
+            ctx.lineWidth = 3;
+            ctx.strokeRect(...pred.bbox);
+            ctx.font = "16px sans-serif";
+            ctx.fillStyle = "white";
+            ctx.fillText(`${pred.class} (${(pred.score * 100).toFixed(1)}%)`, pred.bbox[0], pred.bbox[1] - 5);
+          }
+        });
+
+        requestAnimationFrame(predict);
+      }
+
+      predict();
+    }
+
+    setupCamera().then(() => {
+      detect();
+    });
+  </script>
+</body>
+</html>
